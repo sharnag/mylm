@@ -7,12 +7,74 @@
 #' @param subset an optional vector specifying a subset of observations to be used in the fitting process.
 #'
 #' @export
-mylm <- function(formula, data, subset=NULL) {
 
-  if(!is.null(subset)) data <- data[subset,]
+# "mylm" function has been modified to include input validation tests, 
+# including accepting an optional data frame or list object in the "data" argument.
+# Modified by: Sharna Granwal
+# Last Modified Date: 4/08/2023
 
+mylm <- function(formula, data=NULL, subset=NULL) {
+  # Check if "formula" argument is null
+  if(is.null(formula)){
+  } # if null, system error thrown before continuing - "argument \"formula\" is missing, with no default"
+  
+  # Try to coerce the "formula" argument to an object of type formula
+  # This should succeed for formula objects and strings of the correct format
+  tryCatch(
+    expr = {formula <-as.formula(formula)},
+    error = function(e){stop('The argument \"formula\" is not a valid formula')},
+    warning = function(w){stop('The argument \"formula\" is not a valid formula')}
+  )
+  
+  # Check if "data" argument is null
+  if(is.null(data)){
+    # Create data frame using environment variables based on formula by
+    # re-using functionality in model matrix, then convert to a new dataframe object named "data"
+    tryCatch(
+      expr = {data <- data.frame(model.matrix(formula,data=environment(formula)))},
+      error = function(e){stop('There was an error generating the dataframe from the environment variables.')}
+    )
+    # Add the response variable to the dataframe 
+    data$y <- eval(parse(text = formula[[2]]), envir=parent.frame()) 
+    colnames(data)[which(colnames(data) == 'y')] <- format(formula[[2]])
+  }
+  
+  # Check if "data" argument is a list or dataframe object
+  if(!is.data.frame(data) & !is.list(data)){
+    stop('The argument \"data\" is not a dataframe or list object')
+  }
+  
+  # Convert list object to a dataframe
+  if(is.list(data)){
+    data <- as.data.frame(data)
+  }
+  
+  # Check the "subset" argument is a numerical or logical vector
+  if(!is.null(subset)){ 
+    if(!is.vector(subset)){
+      stop('The argument \"subset\" is not a vector')
+    }
+    if(is.vector(subset) & !is.numeric(subset) & !is.logical(subset)){
+      stop('The argument \"subset\" is not a numerical or logical vector')
+    }
+    
+    # Check "subset" argument is in valid range 
+    if(is.numeric(subset)){
+      if(min(subset)<0 ||max(subset) > nrow(data)){
+        stop('The subset is out of range')
+      }
+    }
+    data <- data[subset,]
+  }
+  
+  # Begin original function
   yname <- as.character(formula[[2]])
-  yvec <- data[,yname]
+  
+  tryCatch(
+    expr={yvec <- data[,yname]},
+    error = function(e){stop('The response variable is undefined')}
+  )
+  
   xmat <- model.matrix(formula, data=data)
   df.residual <- nrow(xmat)-ncol(xmat)
 
